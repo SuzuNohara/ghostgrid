@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 from map import draw_grid
+from kore import Kore
 
 # Initialize pygame
 pygame.init()
@@ -17,8 +18,8 @@ SCREEN_WIDTH = screen_info.current_w
 SCREEN_HEIGHT = screen_info.current_h
 
 # Generating grid dimensions
-GRID_COLS = 30
-GRID_ROWS = 15
+GRID_COLS = 20
+GRID_ROWS = 10
 CELL_WIDTH = SCREEN_WIDTH // GRID_COLS
 CELL_HEIGHT = SCREEN_HEIGHT // GRID_ROWS
 
@@ -31,15 +32,24 @@ clock = pygame.time.Clock()
 
 # Loading assets
 ghost_path = os.path.join("assets", "ghost.png")
-sentinel_path = os.path.join("assets", "sentinel.png")
-node_path = os.path.join("assets", "node.png")
-connection_path = os.path.join("assets", "connection.png")
-
 ghost_img = pygame.image.load(ghost_path)
 if CELL_WIDTH > CELL_HEIGHT:
     ghost_img = pygame.transform.scale(ghost_img, (CELL_HEIGHT, CELL_HEIGHT))
 else:
     ghost_img = pygame.transform.scale(ghost_img, (CELL_WIDTH, CELL_WIDTH))
+
+font = pygame.font.SysFont(None, 24)
+
+# Kore grid setup
+kore = Kore(GRID_COLS, GRID_ROWS)
+kore.create_connections()
+
+# Set node positions to center of grid squares
+for row in kore.nodes:
+    for node in row:
+        col, layer = map(int, node.id.split(','))
+        node.position_x = col * CELL_WIDTH + CELL_WIDTH // 2
+        node.position_y = layer * CELL_HEIGHT + CELL_HEIGHT // 2
 
 def main():
     running = True
@@ -47,31 +57,39 @@ def main():
     ghost_y = (SCREEN_HEIGHT - CELL_HEIGHT) // 2
 
     while running:
-        # Exit mechanism
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
 
-        # Movement controls (uncomment to enable)
-        # keys = pygame.key.get_pressed()
-        # if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        #     ghost_x -= MOVE_SPEED
-        # if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        #     ghost_x += MOVE_SPEED
-        # if keys[pygame.K_UP] or keys[pygame.K_w]:
-        #     ghost_y -= MOVE_SPEED
-        # if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        #     ghost_y += MOVE_SPEED
-
-        # Keep ghost within screen bounds
-        # ghost_x = max(0, min(ghost_x, SCREEN_WIDTH - CELL_WIDTH))
-        # ghost_y = max(0, min(ghost_y, SCREEN_HEIGHT - CELL_HEIGHT))
-
         screen.fill(BLACK)
         screen.blit(ghost_img, (ghost_x, ghost_y))
         draw_grid(GRID_COLS, GRID_ROWS, CELL_WIDTH, CELL_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, screen)
+
+        # Draw only connection costs
+        for row in kore.nodes:
+            for node in row:
+                for conn in node.connections:
+                    if node.id < conn.node_b:
+                        # Find neighbor node
+                        neighbor = None
+                        for r in kore.nodes:
+                            for n in r:
+                                if n.id == conn.node_b:
+                                    neighbor = n
+                                    break
+                            if neighbor:
+                                break
+                        if neighbor:
+                            start = (node.position_x, node.position_y)
+                            end = (neighbor.position_x, neighbor.position_y)
+                            # Draw cost at midpoint
+                            mid = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
+                            cost_surf = font.render(str(conn.cost), True, (255, 255, 0))
+                            cost_rect = cost_surf.get_rect(center=mid)
+                            screen.blit(cost_surf, cost_rect)
+
         pygame.display.flip()
         clock.tick(FPS)
 
