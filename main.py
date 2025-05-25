@@ -67,28 +67,28 @@ def main():
         screen.blit(ghost_img, (ghost_x, ghost_y))
         draw_grid(GRID_COLS, GRID_ROWS, CELL_WIDTH, CELL_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, screen)
 
-        # Draw only connection costs
         for row in kore.nodes:
             for node in row:
-                for conn in node.connections:
-                    if node.id < conn.node_b:
-                        # Find neighbor node
-                        neighbor = None
-                        for r in kore.nodes:
-                            for n in r:
-                                if n.id == conn.node_b:
-                                    neighbor = n
+                if node.ghosts or node.sentinels or node.money > 0:
+                    for conn in node.connections:
+                        if node.id < conn.node_b:
+                            # Find neighbor node
+                            neighbor = None
+                            for r in kore.nodes:
+                                for n in r:
+                                    if n.id == conn.node_b:
+                                        neighbor = n
+                                        break
+                                if neighbor:
                                     break
                             if neighbor:
-                                break
-                        if neighbor:
-                            start = (node.position_x, node.position_y)
-                            end = (neighbor.position_x, neighbor.position_y)
-                            # Draw cost at midpoint
-                            mid = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
-                            cost_surf = font.render(str(conn.cost), True, (255, 255, 0))
-                            cost_rect = cost_surf.get_rect(center=mid)
-                            screen.blit(cost_surf, cost_rect)
+                                start = (node.position_x, node.position_y)
+                                end = (neighbor.position_x, neighbor.position_y)
+                                # Draw cost at midpoint
+                                mid = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
+                                cost_surf = font.render(str(conn.cost), True, (255, 255, 0))
+                                cost_rect = cost_surf.get_rect(center=mid)
+                                screen.blit(cost_surf, cost_rect)
 
         pygame.display.flip()
         clock.tick(FPS)
