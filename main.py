@@ -96,13 +96,13 @@ def draw_environment(screen, kore, ghost_img, sentinel_img, cell_width, cell_hei
                         if neighbor:
                             break
                     if neighbor:
-                        start = (node.position_x, node.position_y)
-                        end = (neighbor.position_x, neighbor.position_y)
-                        mid = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
-                        cost_surf = font.render(str(conn.cost), True, (255, 255, 0))
-                        cost_rect = cost_surf.get_rect(center=mid)
-                        screen.blit(cost_surf, cost_rect)
-                        pygame.draw.line(screen, (100, 100, 100), start, end, 2)
+                        # Only draw if either node or neighbor has ghosts, sentinels, or money
+                        if (node.ghosts or node.sentinels or node.money > 0 or
+                            neighbor.ghosts or neighbor.sentinels or neighbor.money > 0):
+                            mid = ((node.position_x + neighbor.position_x) // 2, (node.position_y + neighbor.position_y) // 2)
+                            cost_surf = font.render(str(conn.cost), True, (255, 255, 0))
+                            cost_rect = cost_surf.get_rect(center=mid)
+                            screen.blit(cost_surf, cost_rect)
                     drawn_connections.add(pair)
 
 def main():
