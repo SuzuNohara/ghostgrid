@@ -106,6 +106,18 @@ def testing_set(kore):
     for node in money_nodes:
         node.money += random.randint(10, 50)
 
+def test_agent(kore, agent_type):
+    all_nodes = [node for row in kore.nodes for node in row]
+    node = random.choice(all_nodes)
+    if agent_type == "sentinel":
+        sentinel = Sentinel(gen_name("sentinel"), node.position_x, node.position_y, 0, False, False, 100)
+        node.sentinels.append(sentinel)
+        print(f"Added Sentinel {sentinel.id} at node {node.id}")
+    elif agent_type == "ghost":
+        ghost = Ghost(gen_name("ghost"), node.position_x, node.position_y, 0, False, False, 100)
+        node.ghosts.append(ghost)
+        print(f"Added Ghost {ghost.id} at node {node.id}")
+
 def build_environment(grid_cols, grid_rows, cell_width, cell_height):
     kore = Kore(grid_cols, grid_rows)
     kore.create_connections()
@@ -115,7 +127,8 @@ def build_environment(grid_cols, grid_rows, cell_width, cell_height):
             node.position_x = col * cell_width + cell_width // 2
             node.position_y = layer * cell_height + cell_height // 2
 
-    testing_set(kore)
+    # testing_set(kore)
+    test_agent(kore, "ghost")
     return kore
 
 def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font):
@@ -164,6 +177,42 @@ def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, slee
                             screen.blit(cost_surf, cost_rect)
                     drawn_connections.add(pair)
 
+def loop_turn(kore, current_time):
+    agent = None
+    current_node = None
+    for row in kore.nodes:
+        for node in row:
+            if node.ghosts:
+                agent = node.ghosts[0]
+                current_node = node
+                break
+        if agent:
+            break
+    if not agent or not current_node:
+        return
+
+    # Determine direction: even turn = left, odd turn = right
+    direction = -1 if current_time % 2 == 0 else 1
+    new_x = (current_node.position_x // (kore.n if kore.n else 1)) + direction
+    new_y = current_node.position_y // (kore.m if kore.m else 1)
+
+    dest_node = kore.get_node_by_position(current_node.id, 0, direction)
+    if dest_node:
+        print(f"moving from {current_node.id} to {dest_node.id}")
+        for row in kore.nodes:
+            for node in row:
+                if (node.position_x // (kore.n if kore.n else 1)) == new_x and \
+                   (node.position_y // (kore.m if kore.m else 1)) == new_y:
+                    dest_node = node
+                    break
+            if dest_node:
+                break
+
+    if dest_node:
+        print(f"Current node: {current_node.id}, Destination node: {dest_node.id}, agent: {agent.id}")
+        moved = kore.move(current_node.id, dest_node.id, agent.id)
+        print(f"Turn {current_time}: Moved ghost {agent.id} {'left' if direction == -1 else 'right'}: {moved}")
+
 def main():
     pygame.init()
     screen_info = pygame.display.Info()
@@ -177,11 +226,18 @@ def main():
     ghost_img, sentinel_img, deathghost_img, greedysentinel_img, money_img, restingsentinel_img, sleepingghost_img = load_assets(cell_width, cell_height)
     kore = build_environment(GRID_COLS, GRID_ROWS, cell_width, cell_height)
 
+    last_action_time = pygame.time.get_ticks()
+
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 running = False
+
+        current_time = pygame.time.get_ticks()
+        if current_time - last_action_time >= 1000:
+            loop_turn(kore, current_time // 1000)
+            last_action_time = current_time
 
         screen.fill(BLACK)
         draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font)

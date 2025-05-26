@@ -69,3 +69,59 @@ class Kore:
                 )
             result.append(node_copy)
         return result
+
+    def get_node_by_id(self, node_id):
+        all_nodes = [node for row in self.nodes for node in row]
+        return next((n for n in all_nodes if n.id == node_id), None)
+
+    def get_node_by_position(self, node_id, vertical, horizontal):
+        # node_id format: "x,y"
+        try:
+            x, y = map(int, node_id.split(','))
+            new_x = x + vertical
+            new_y = y + horizontal
+            new_id = f"{new_x},{new_y}"
+            return self.get_node_by_id(new_id)
+        except Exception:
+            return None
+
+
+
+    def move(self, node_origin_id, node_dest_id, agent_id):
+        all_nodes = [node for row in self.nodes for node in row]
+        origin = next((n for n in all_nodes if n.id == node_origin_id), None)
+        dest = next((n for n in all_nodes if n.id == node_dest_id), None)
+        if not origin or not dest:
+            return False
+
+        # get the cost of the connection
+        connection = next((conn for conn in origin.connections if conn.node_b == node_dest_id or conn.node_a == node_dest_id), None)
+
+        if not any(conn.node_b == node_dest_id or conn.node_a == node_dest_id for conn in origin.connections):
+            return False  # Not connected
+
+        # Verify agent exists in origin node
+        if not any(g.id == agent_id for g in origin.ghosts) and not any(s.id == agent_id for s in origin.sentinels):
+            return False
+
+        # Try to move ghost
+        agent = next((g for g in origin.ghosts if g.id == agent_id), None)
+        if agent and connection and agent.stamina >= connection.cost:
+            origin.ghosts.remove(agent)
+            dest.ghosts.append(agent)
+            agent.position_x = dest.position_x
+            agent.position_y = dest.position_y
+            agent.stamina -= connection.cost
+            return True
+
+        # Try to move sentinel
+        agent = next((s for s in origin.sentinels if s.id == agent_id), None)
+        if agent and connection and agent.stamina >= connection.cost:
+            origin.sentinels.remove(agent)
+            dest.sentinels.append(agent)
+            agent.position_x = dest.position_x
+            agent.position_y = dest.position_y
+            agent.stamina -= connection.cost
+            return True
+
+        return False
