@@ -102,6 +102,10 @@ def testing_set(kore):
         sentinel_nodes[2].sentinels[0].greedy = True
         sentinel_nodes[3].sentinels[0].greedy = True
 
+    money_nodes = random.sample(all_nodes, 5)
+    for node in money_nodes:
+        node.money += random.randint(10, 50)
+
 def build_environment(grid_cols, grid_rows, cell_width, cell_height):
     kore = Kore(grid_cols, grid_rows)
     kore.create_connections()
@@ -114,7 +118,7 @@ def build_environment(grid_cols, grid_rows, cell_width, cell_height):
     testing_set(kore)
     return kore
 
-def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, cell_width, cell_height, font):
+def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font):
     draw_grid(GRID_COLS, GRID_ROWS, cell_width, cell_height, screen.get_width(), screen.get_height(), screen)
     drawn_connections = set()
     for row in kore.nodes:
@@ -135,6 +139,11 @@ def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, slee
                 else:
                     img = sentinel_img
                 screen.blit(img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
+            if node.money > 0:
+                screen.blit(money_img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
+                money_surf = font.render(str(node.money), True, (0, 0, 0))
+                money_rect = money_surf.get_rect(center=(node.position_x, node.position_y + cell_height // 6))
+                screen.blit(money_surf, money_rect)
             for conn in node.connections:
                 pair = tuple(sorted([node.id, conn.node_b]))
                 if pair not in drawn_connections:
@@ -175,7 +184,7 @@ def main():
                 running = False
 
         screen.fill(BLACK)
-        draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, cell_width, cell_height, font)
+        draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font)
         pygame.display.flip()
         clock.tick(FPS)
 
