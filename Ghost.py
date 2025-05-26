@@ -1,3 +1,5 @@
+import random
+
 class Ghost:
     def __init__(self, ghost_id, position_x, position_y, money=0, captured=False, resting=False, stamina=100):
         self.id = ghost_id
