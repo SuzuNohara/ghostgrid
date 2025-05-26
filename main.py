@@ -11,8 +11,10 @@ from Ghost import Ghost
 # Constants
 FPS = 30
 BLACK = (0, 0, 0)
-GRID_COLS = 25
-GRID_ROWS = 15
+# GRID_COLS = 25
+# GRID_ROWS = 15
+GRID_COLS = 15
+GRID_ROWS = 10
 
 def load_assets(cell_width, cell_height):
     ghost_path = os.path.join("assets", "ghost.png")
@@ -94,6 +96,12 @@ def testing_set(kore):
         sentinel = Sentinel(gen_name("sentinel"), node.position_x, node.position_y, 0, False, False, 100)
         node.sentinels.append(sentinel)
 
+    if len(sentinel_nodes) >= 4:
+        sentinel_nodes[0].sentinels[0].resting = True
+        sentinel_nodes[1].sentinels[0].resting = True
+        sentinel_nodes[2].sentinels[0].greedy = True
+        sentinel_nodes[3].sentinels[0].greedy = True
+
 def build_environment(grid_cols, grid_rows, cell_width, cell_height):
     kore = Kore(grid_cols, grid_rows)
     kore.create_connections()
@@ -106,7 +114,7 @@ def build_environment(grid_cols, grid_rows, cell_width, cell_height):
     testing_set(kore)
     return kore
 
-def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, cell_width, cell_height, font):
+def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, cell_width, cell_height, font):
     draw_grid(GRID_COLS, GRID_ROWS, cell_width, cell_height, screen.get_width(), screen.get_height(), screen)
     drawn_connections = set()
     for row in kore.nodes:
@@ -120,7 +128,13 @@ def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, slee
                     img = ghost_img
                 screen.blit(img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
             for sentinel in node.sentinels:
-                screen.blit(sentinel_img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
+                if hasattr(sentinel, "resting") and sentinel.resting:
+                    img = restingsentinel_img
+                elif hasattr(sentinel, "greedy") and sentinel.greedy:
+                    img = greedysentinel_img
+                else:
+                    img = sentinel_img
+                screen.blit(img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
             for conn in node.connections:
                 pair = tuple(sorted([node.id, conn.node_b]))
                 if pair not in drawn_connections:
@@ -161,7 +175,7 @@ def main():
                 running = False
 
         screen.fill(BLACK)
-        draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, cell_width, cell_height, font)
+        draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, cell_width, cell_height, font)
         pygame.display.flip()
         clock.tick(FPS)
 
