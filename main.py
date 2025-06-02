@@ -134,24 +134,70 @@ def build_environment(grid_cols, grid_rows, cell_width, cell_height):
 def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font):
     draw_grid(GRID_COLS, GRID_ROWS, cell_width, cell_height, screen.get_width(), screen.get_height(), screen)
     drawn_connections = set()
+    bar_width = 6
+    bar_height = cell_height
+    bar_offset = - 20
+
     for row in kore.nodes:
         for node in row:
-            for ghost in node.ghosts:
+            for idx, ghost in enumerate(node.ghosts):
                 if hasattr(ghost, "death") and ghost.death:
                     img = deathghost_img
                 elif hasattr(ghost, "sleeping") and ghost.sleeping:
                     img = sleepingghost_img
                 else:
                     img = ghost_img
-                screen.blit(img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
-            for sentinel in node.sentinels:
+                sprite_x = node.position_x - cell_width // 2
+                sprite_y = node.position_y - cell_height // 2
+                screen.blit(img, (sprite_x, sprite_y))
+
+                # Draw stamina (red) and money (green) bars
+                stamina = max(0, min(ghost.stamina, 100))
+                money = max(0, min(getattr(ghost, "money", 0), 100))
+                bar_x = sprite_x + img.get_width() + bar_offset
+                bar_y = sprite_y
+
+                # Stamina bar (red)
+                stamina_bar_height = int(bar_height * (stamina / 100))
+                pygame.draw.rect(screen, (255, 0, 0),
+                                 (bar_x, bar_y + bar_height - stamina_bar_height, bar_width, stamina_bar_height))
+                pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
+
+                # Money bar (green)
+                money_bar_height = int(bar_height * (money / 100))
+                pygame.draw.rect(screen, (0, 200, 0), (
+                bar_x + bar_width + 2, bar_y + bar_height - money_bar_height, bar_width, money_bar_height))
+                pygame.draw.rect(screen, (100, 100, 100), (bar_x + bar_width + 2, bar_y, bar_width, bar_height), 1)
+
+            for idx, sentinel in enumerate(node.sentinels):
                 if hasattr(sentinel, "resting") and sentinel.resting:
                     img = restingsentinel_img
                 elif hasattr(sentinel, "greedy") and sentinel.greedy:
                     img = greedysentinel_img
                 else:
                     img = sentinel_img
-                screen.blit(img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
+                sprite_x = node.position_x - cell_width // 2
+                sprite_y = node.position_y - cell_height // 2
+                screen.blit(img, (sprite_x, sprite_y))
+
+                # Draw stamina (red) and money (green) bars
+                stamina = max(0, min(sentinel.stamina, 100))
+                money = max(0, min(getattr(sentinel, "money", 0), 100))
+                bar_x = sprite_x + img.get_width() + bar_offset
+                bar_y = sprite_y
+
+                # Stamina bar (red)
+                stamina_bar_height = int(bar_height * (stamina / 100))
+                pygame.draw.rect(screen, (255, 0, 0),
+                                 (bar_x, bar_y + bar_height - stamina_bar_height, bar_width, stamina_bar_height))
+                pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
+
+                # Money bar (green)
+                money_bar_height = int(bar_height * (money / 100))
+                pygame.draw.rect(screen, (0, 200, 0), (
+                bar_x + bar_width + 2, bar_y + bar_height - money_bar_height, bar_width, money_bar_height))
+                pygame.draw.rect(screen, (100, 100, 100), (bar_x + bar_width + 2, bar_y, bar_width, bar_height), 1)
+
             if node.money > 0:
                 screen.blit(money_img, (node.position_x - cell_width // 2, node.position_y - cell_height // 2))
                 money_surf = font.render(str(node.money), True, (0, 0, 0))
@@ -177,6 +223,12 @@ def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, slee
                             screen.blit(cost_surf, cost_rect)
                     drawn_connections.add(pair)
 
+            id_surf = font.render(str(node.id), True, (255, 255, 255))
+            id_rect = id_surf.get_rect()
+            id_rect.topleft = (
+            node.position_x - cell_width // 2 + 4, node.position_y + cell_height // 2 - id_rect.height - 4)
+            screen.blit(id_surf, id_rect)
+
 def loop_turn(kore, current_time):
     agent = None
     current_node = None
@@ -196,7 +248,7 @@ def loop_turn(kore, current_time):
     new_x = (current_node.position_x // (kore.n if kore.n else 1)) + direction
     new_y = current_node.position_y // (kore.m if kore.m else 1)
 
-    dest_node = kore.get_node_by_position(current_node.id, 0, direction)
+    dest_node = kore.get_node_by_move(current_node.id, 0, direction)
     if dest_node:
         print(f"moving from {current_node.id} to {dest_node.id}")
         for row in kore.nodes:

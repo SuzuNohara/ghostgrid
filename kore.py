@@ -74,18 +74,26 @@ class Kore:
         all_nodes = [node for row in self.nodes for node in row]
         return next((n for n in all_nodes if n.id == node_id), None)
 
-    def get_node_by_position(self, node_id, vertical, horizontal):
+    def get_node_by_move(self, node_id, vertical, horizontal):
         # node_id format: "x,y"
         try:
             x, y = map(int, node_id.split(','))
-            new_x = x + vertical
-            new_y = y + horizontal
+            new_x = x + horizontal
+            new_y = y + vertical
             new_id = f"{new_x},{new_y}"
             return self.get_node_by_id(new_id)
         except Exception:
             return None
 
-
+    def get_id_by_move(self, node_id, vertical, horizontal):
+        try:
+            x, y = map(int, node_id.split(','))
+            new_x = x + horizontal
+            new_y = y + vertical
+            new_id = f"{new_x},{new_y}"
+            return self.get_node_by_id(new_id)
+        except Exception:
+            return None
 
     def move(self, node_origin_id, node_dest_id, agent_id):
         all_nodes = [node for row in self.nodes for node in row]
