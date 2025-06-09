@@ -114,7 +114,7 @@ def test_agent(kore, agent_type):
         node.sentinels.append(sentinel)
         print(f"Added Sentinel {sentinel.id} at node {node.id}")
     elif agent_type == "ghost":
-        ghost = Ghost(gen_name("ghost"), node.position_x, node.position_y, 0, False, False, 100)
+        ghost = Ghost("test_ghost", node.position_x, node.position_y, 0, False, False, 100)
         node.ghosts.append(ghost)
         print(f"Added Ghost {ghost.id} at node {node.id}")
 
@@ -265,6 +265,120 @@ def loop_turn(kore, current_time):
         moved = kore.move(current_node.id, dest_node.id, agent.id)
         print(f"Turn {current_time}: Moved ghost {agent.id} {'left' if direction == -1 else 'right'}: {moved}")
 
+def ghost_command_processor(agent, command, kore):
+    current_agent = kore.get_agent_by_id(agent)
+    current_node = kore.get_node_by_position(current_agent.position_x, current_agent.position_y)
+
+    move_map = {
+        "move-r": (0, 1),
+        "move-l": (0, -1),
+        "move-d": (1, 0),
+        "move-u": (-1, 0),
+        "move-ur": (-1, 1),
+        "move-dr": (1, 1),
+        "move-ul": (-1, -1),
+        "move-ud": (1, -1),
+    }
+
+    if command in move_map:
+        v, h = move_map[command]
+        dest_node = kore.get_node_by_move(current_node.id, v, h)
+        if dest_node:
+            moved = kore.move(current_node.id, dest_node.id, current_agent.id)
+            print(f"Moved {current_agent.id} from {current_node.id} to {dest_node.id}: {moved}")
+        else:
+            print("Invalid move.")
+    elif command == "rest":
+        current_agent.stamina = min(100, current_agent.stamina + 10)
+        print(f"{current_agent.id} rested. Stamina: {current_agent.stamina}")
+    elif command.startswith("drop-"):
+        try:
+            amount = int(command.split("-")[1])
+            if hasattr(current_agent, "money") and current_agent.money >= amount:
+                current_agent.money -= amount
+                current_node.money += amount
+                print(f"{current_agent.id} dropped {amount} money.")
+            else:
+                print("Not enough money to drop.")
+        except Exception:
+            print("Invalid drop command.")
+    elif command.startswith("take-"):
+        try:
+            amount = int(command.split("-")[1])
+            if current_node.money >= amount:
+                current_node.money -= amount
+                if hasattr(current_agent, "money"):
+                    current_agent.money += amount
+                else:
+                    current_agent.money = amount
+                print(f"{current_agent.id} took {amount} money.")
+            else:
+                print("Not enough money in node.")
+        except Exception:
+            print("Invalid take command.")
+    else:
+        print("Unknown command.")
+
+def sentinel_command_processor(agent, command, kore):
+    current_agent = kore.get_agent_by_id(agent)
+    current_node = kore.get_node_by_position(current_agent.position_x, current_agent.position_y)
+
+    move_map = {
+        "move-r": (0, 1),
+        "move-l": (0, -1),
+        "move-d": (1, 0),
+        "move-u": (-1, 0),
+        "move-ur": (-1, 1),
+        "move-dr": (1, 1),
+        "move-ul": (-1, -1),
+        "move-ud": (1, -1),
+    }
+
+    if command in move_map:
+        v, h = move_map[command]
+        dest_node = kore.get_node_by_move(current_node.id, v, h)
+        if dest_node:
+            moved = kore.move(current_node.id, dest_node.id, current_agent.id)
+            print(f"Moved {current_agent.id} from {current_node.id} to {dest_node.id}: {moved}")
+        else:
+            print("Invalid move.")
+    elif command == "rest":
+        current_agent.stamina = min(100, current_agent.stamina + 10)
+        print(f"{current_agent.id} rested. Stamina: {current_agent.stamina}")
+    elif command.startswith("drop-"):
+        try:
+            amount = int(command.split("-")[1])
+            if hasattr(current_agent, "money") and current_agent.money >= amount:
+                current_agent.money -= amount
+                current_node.money += amount
+                print(f"{current_agent.id} dropped {amount} money.")
+            else:
+                print("Not enough money to drop.")
+        except Exception:
+            print("Invalid drop command.")
+    elif command.startswith("take-"):
+        try:
+            amount = int(command.split("-")[1])
+            if current_node.money >= amount:
+                current_node.money -= amount
+                if hasattr(current_agent, "money"):
+                    current_agent.money += amount
+                else:
+                    current_agent.money = amount
+                print(f"{current_agent.id} took {amount} money.")
+            else:
+                print("Not enough money in node.")
+        except Exception:
+            print("Invalid take command.")
+    else:
+        print("Unknown command.")
+
+def command_processor(agent, type, command, kore):
+    if type == "ghost":
+        ghost_command_processor(agent, command, kore)
+    elif type == "sentinel":
+        sentinel_command_processor(agent, command, kore)
+
 def main():
     pygame.init()
     screen_info = pygame.display.Info()
@@ -288,7 +402,9 @@ def main():
 
         current_time = pygame.time.get_ticks()
         if current_time - last_action_time >= 1000:
-            loop_turn(kore, current_time // 1000)
+            # loop_turn(kore, current_time // 1000)
+            command = input("Command: ")
+            command_processor("test_ghost", "ghost", command, kore)
             last_action_time = current_time
 
         screen.fill(BLACK)

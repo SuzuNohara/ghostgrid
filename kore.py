@@ -74,6 +74,21 @@ class Kore:
         all_nodes = [node for row in self.nodes for node in row]
         return next((n for n in all_nodes if n.id == node_id), None)
 
+    def get_node_by_position(self, position_x, position_y):
+        all_nodes = [node for row in self.nodes for node in row]
+        return next((n for n in all_nodes if n.position_x == position_x and n.position_y == position_y), None)
+
+    def get_agent_by_id(self, agent_id):
+        all_nodes = [node for row in self.nodes for node in row]
+        for node in all_nodes:
+            agent = next((g for g in node.ghosts if g.id == agent_id), None)
+            if agent:
+                return agent
+            agent = next((s for s in node.sentinels if s.id == agent_id), None)
+            if agent:
+                return agent
+        return None
+
     def get_node_by_move(self, node_id, vertical, horizontal):
         # node_id format: "x,y"
         try:
