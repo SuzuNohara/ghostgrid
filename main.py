@@ -405,6 +405,17 @@ def main():
             # loop_turn(kore, current_time // 1000)
             command = input("Command: ")
             command_processor("test_ghost", "ghost", command, kore)
+            # move-r
+            # move-l
+            # move-d
+            # move-u
+            # move-ur
+            # move-dr
+            # move-ul
+            # move-dl
+            # rest
+            # drop-10
+            # take-10
             last_action_time = current_time
 
         screen.fill(BLACK)
