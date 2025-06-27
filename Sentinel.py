@@ -8,6 +8,9 @@ class Sentinel:
         self.resting = resting
         self.stamina = stamina
 
+        # A set to store IDs of visited nodes of memory
+        self.visited_nodes = set()
+
     def __repr__(self):
         return (f"Sentinel(id={self.id}, x={self.position_x}, y={self.position_y}, "
                 f"money={self.money}, capturing={self.capturing}, "
