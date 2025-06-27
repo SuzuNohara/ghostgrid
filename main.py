@@ -131,6 +131,7 @@ def build_environment(grid_cols, grid_rows, cell_width, cell_height):
 
     # testing_set(kore)
     test_agent(kore, "ghost")
+    test_agent(kore, "sentinel") 
     return kore
 
 def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font):
@@ -432,42 +433,39 @@ def main():
     turn_count = 1
     running = True
     while running:
+        # ===============================================================
+        # 1. MANEJO DE EVENTOS (Se ejecuta en cada fotograma)
+        # ===============================================================
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 running = False
 
+        # ===============================================================
+        # 2. LÓGICA DEL JUEGO (Se ejecuta solo una vez por segundo)
+        # ===============================================================
         current_time = pygame.time.get_ticks()
         if current_time - last_action_time >= 1000:
             print(f"\n===== INICIO DEL TURNO {turn_count} =====")
 
-            # --- GESTIÓN DINÁMICA DE AGENTES ---
-            # Escanea el mapa para obtener una lista fresca de agentes en cada turno
-            active_ghosts = []
-            active_sentinels = []
-            for row in kore.nodes:
-                for node in row:
-                    active_ghosts.extend(node.ghosts)
-                    active_sentinels.extend(node.sentinels)
+            # Escanea el mapa para obtener agentes activos
+            active_ghosts = [ghost for row in kore.nodes for node in row for ghost in node.ghosts]
+            active_sentinels = [sentinel for row in kore.nodes for node in row for sentinel in node.sentinels]
             
-            # --- TURNO DE LOS GHOSTS (AUTÓNOMO) ---
+            # --- FASE GHOST ---
             print(f"--- FASE GHOST --- ({len(active_ghosts)} activos)")
             for ghost in active_ghosts:
-                # La IA del Ghost decide su acción
                 command = ghost_turn(ghost.id, kore, turn_count)
                 print(f"  - Ghost '{ghost.id}' decide: {command}")
-                # El motor del juego ejecuta la acción
                 command_processor(ghost.id, "ghost", command, kore)
 
-            # --- TURNO DE LOS SENTINELS (AUTÓNOMO) ---
+            # --- FASE SENTINEL ---
             print(f"--- FASE SENTINEL --- ({len(active_sentinels)} activos)")
             for sentinel in active_sentinels:
-                # La IA del Sentinel decide su acción
                 command = sentinel_turn(sentinel.id, kore)
                 print(f"  - Sentinel '{sentinel.id}' decide: {command}")
-                # El motor del juego ejecuta la acción
                 command_processor(sentinel.id, "sentinel", command, kore)
 
-            # Actualiza el estado para el siguiente turno
+            # Actualiza para el siguiente turno
             turn_count += 1
             last_action_time = current_time
             print("=" * 25)
