@@ -165,4 +165,6 @@ def sentinel_turn(sentinel_id, kore):
         return get_move_command(current_node, next_node_id)
     else:
         return "rest" # No path or already at target, rest
+
+
     

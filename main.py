@@ -1,3 +1,4 @@
+from ghost_method import get_move_command, ghost_turn
 import pygame
 import sys
 import os
@@ -7,6 +8,7 @@ from kore import Kore
 from Sentinel import Sentinel
 from Node import Node, Connection
 from Ghost import Ghost
+from sentinel_method import a_star_search, sentinel_turn
 
 # Constants
 FPS = 30
@@ -106,17 +108,46 @@ def testing_set(kore):
     for node in money_nodes:
         node.money += random.randint(10, 50)
 
-def test_agent(kore, agent_type):
-    all_nodes = [node for row in kore.nodes for node in row]
-    node = random.choice(all_nodes)
-    if agent_type == "sentinel":
-        sentinel = Sentinel(gen_name("sentinel"), node.position_x, node.position_y, 0, False, False, 100)
-        node.sentinels.append(sentinel)
-        print(f"Added Sentinel {sentinel.id} at node {node.id}")
-    elif agent_type == "ghost":
-        ghost = Ghost("test_ghost", node.position_x, node.position_y, 0, False, False, 100)
-        node.ghosts.append(ghost)
-        print(f"Added Ghost {ghost.id} at node {node.id}")
+
+def test_agent(kore, agent_type, num_agents=1):
+    """
+    Crea un número específico de agentes de un tipo y los coloca en sus
+    capas de inicio correctas, distribuyéndolos aleatoriamente dentro de esa capa.
+    """
+    if agent_type == "ghost":
+        # REGLA 1: Los Ghosts solo pueden aparecer en la capa 0.
+        layer_index = 0
+        spawn_nodes = [row[layer_index] for row in kore.nodes]
+        
+        # Reparte el botín inicial entre el número de Ghosts a crear.
+        initial_money = 100 // num_agents if num_agents > 0 else 100
+
+        for i in range(num_agents):
+            # Elige un nodo aleatorio DIFERENTE para cada Ghost dentro de la capa 0.
+            node = random.choice(spawn_nodes)
+            ghost_id = f"ghost_{i+1}"
+            ghost = Ghost(ghost_id, node.position_x, node.position_y, initial_money)
+            node.ghosts.append(ghost)
+            print(f"-> Ghost '{ghost_id}' añadido en el nodo {node.id} (Capa {layer_index})")
+
+    elif agent_type == "sentinel":
+        # REGLA 2: Los Sentinels solo pueden aparecer en la capa n-1.
+        # El índice de la penúltima capa. Se resta 2 porque los índices empiezan en 0.
+        layer_index = len(kore.nodes[0]) - 2 
+        
+        # Nos aseguramos de que el índice no sea negativo si el mapa es muy pequeño.
+        if layer_index < 0:
+            layer_index = 0
+            
+        spawn_nodes = [row[layer_index] for row in kore.nodes]
+
+        for i in range(num_agents):
+            # Elige un nodo aleatorio DIFERENTE para cada Sentinel dentro de su capa.
+            node = random.choice(spawn_nodes)
+            sentinel_id = f"sentinel_{i+1}"
+            sentinel = Sentinel(sentinel_id, node.position_x, node.position_y)
+            node.sentinels.append(sentinel)
+            print(f"-> Sentinel '{sentinel_id}' añadido en el nodo {node.id} (Capa {layer_index})")
 
 def build_environment(grid_cols, grid_rows, cell_width, cell_height):
     kore = Kore(grid_cols, grid_rows)
@@ -127,8 +158,9 @@ def build_environment(grid_cols, grid_rows, cell_width, cell_height):
             node.position_x = col * cell_width + cell_width // 2
             node.position_y = layer * cell_height + cell_height // 2
 
-    # testing_set(kore)
-    test_agent(kore, "ghost")
+    testing_set(kore)
+    # test_agent(kore, "ghost")
+    # test_agent(kore, "sentinel") 
     return kore
 
 def draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font):
@@ -373,13 +405,89 @@ def sentinel_command_processor(agent, command, kore):
     else:
         print("Unknown command.")
 
-def command_processor(agent, type, command, kore):
-    if type == "ghost":
-        ghost_command_processor(agent, command, kore)
-    elif type == "sentinel":
-        sentinel_command_processor(agent, command, kore)
+def command_processor(agent_id, agent_type, command, kore):
+    """
+    Procesa un comando para un agente específico, manejando acciones especiales
+    como la replicación antes de delegar a los procesadores específicos.
+    """
+    # --- MANEJO DE COMANDOS ESPECIALES ---
+    
+    # El comando 'replicate' es manejado aquí directamente porque altera
+    # el estado del juego creando un nuevo agente.
+    if command == "replicate" and agent_type == "ghost":
+        ghost = kore.get_agent_by_id(agent_id)
+        # Verifica que el Ghost exista y tenga suficiente botín para dividirse
+        if ghost and ghost.money > 1:
+            # Divide el botín entre el original y la réplica
+            original_money = ghost.money // 2
+            replica_money = ghost.money - original_money
+            ghost.money = original_money
+
+            # Crea la nueva réplica con un ID único
+            replica_id = f"{ghost.id}_r{random.randint(1, 999)}"
+            replica = Ghost(replica_id, ghost.position_x, ghost.position_y, replica_money)
+            
+            # Añade la réplica al mismo nodo en el que se encuentra el original
+            current_node = kore.get_node_by_position(ghost.position_x, ghost.position_y)
+            if current_node:
+                current_node.ghosts.append(replica)
+                print(f"      -> ¡ACCIÓN! {ghost.id} se ha replicado en {replica_id} en el nodo {current_node.id}.")
+        
+        # Una vez manejada la replicación, no se hace nada más en este turno.
+        return
+
+    # --- DELEGACIÓN A PROCESADORES ESPECÍFICOS ---
+    
+    # Si el comando no es uno especial, se delega al procesador correspondiente.
+    if agent_type == "ghost":
+        ghost_command_processor(agent_id, command, kore)
+    elif agent_type == "sentinel":
+        sentinel_command_processor(agent_id, command, kore)
+
+def check_game_over(kore, turn_count, max_turns=100):
+    """
+    Verifica si se ha cumplido alguna condición de fin de juego.
+    Versión corregida para evitar el IndexError.
+    """
+    # Escanea el estado actual del juego
+    active_ghosts = [g for row in kore.nodes for node in row for g in node.ghosts if not g.captured]
+    total_loot_sentinels = sum(s.money for row in kore.nodes for node in row for s in node.sentinels)
+    
+    # --- CÓDIGO CORREGIDO ---
+    # Se calcula el índice de la capa final (última columna)
+    final_layer_index = len(kore.nodes[0]) - 1
+    # Se obtienen todos los nodos de esa última capa (columna)
+    final_layer_nodes = [row[final_layer_index] for row in kore.nodes]
+    # Se suma el botín solo de los nodos en esa capa
+    total_loot_ghosts_goal = sum(node.money for node in final_layer_nodes)
+    # Condición 1: Sentinels ganan por captura total
+    if not active_ghosts:
+        return "¡VICTORIA PARA LOS SENTINELS! (Todos los Ghosts capturados)"
+
+    # Condición 2: Sentinels ganan por recuperar la mayoría del botín
+    if total_loot_sentinels > 50:
+        return f"¡VICTORIA PARA LOS SENTINELS! (Han recuperado {total_loot_sentinels} de botín)"
+
+    # Condición 3: Ghosts ganan por asegurar la mayoría del botín
+    if total_loot_ghosts_goal > 50:
+        return f"¡VICTORIA PARA LOS GHOSTS! (Han asegurado {total_loot_ghosts_goal} de botín en la meta)"
+
+    # Condición 4: El juego termina por límite de turnos
+    if turn_count >= max_turns:
+        # Se determina el ganador por puntos al final de los turnos
+        print(f"FIN DEL JUEGO POR LÍMITE DE TURNOS ({max_turns}).")
+        if total_loot_sentinels > total_loot_ghosts_goal:
+            return f"VICTORIA PARA SENTINELS POR PUNTOS ({total_loot_sentinels} vs {total_loot_ghosts_goal})"
+        elif total_loot_ghosts_goal > total_loot_sentinels:
+            return f"VICTORIA PARA GHOSTS POR PUNTOS ({total_loot_ghosts_goal} vs {total_loot_sentinels})"
+        else:
+            return f"¡EMPATE! ({total_loot_sentinels} vs {total_loot_ghosts_goal})"
+
+    # Si no se cumple ninguna condición, el juego continúa
+    return None
 
 def main():
+    print("Iniciando main")  # <-- Agrega esto
     pygame.init()
     screen_info = pygame.display.Info()
     screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h), pygame.FULLSCREEN)
@@ -393,30 +501,74 @@ def main():
     kore = build_environment(GRID_COLS, GRID_ROWS, cell_width, cell_height)
 
     last_action_time = pygame.time.get_ticks()
-
+    turn_count = 1
     running = True
     while running:
+        # ===============================================================
+        # 1. MANEJO DE EVENTOS (Se ejecuta en cada fotograma)
+        # ===============================================================
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 running = False
 
+        # ===============================================================
+        # 2. LÓGICA DEL JUEGO (Se ejecuta solo una vez por segundo)
+        # ===============================================================
         current_time = pygame.time.get_ticks()
         if current_time - last_action_time >= 1000:
-            # loop_turn(kore, current_time // 1000)
-            command = input("Command: ")
-            command_processor("test_ghost", "ghost", command, kore)
-            # move-r
-            # move-l
-            # move-d
-            # move-u
-            # move-ur
-            # move-dr
-            # move-ul
-            # move-dl
-            # rest
-            # drop-10
-            # take-10
+            print(f"\n===== INICIO DEL TURNO {turn_count} =====")
+
+            # Escanea el mapa para obtener listas frescas de agentes
+            active_ghosts = [g for row in kore.nodes for node in row for g in node.ghosts]
+            active_sentinels = [s for row in kore.nodes for node in row for s in node.sentinels]
+            
+            # --- FASE GHOST (Lógica individual) ---
+            print(f"--- FASE GHOST --- ({len(active_ghosts)} activos)")
+            for ghost in active_ghosts:
+                command = ghost_turn(ghost.id, kore, turn_count)
+                print(f"  - Ghost '{ghost.id}' decide: {command}")
+                command_processor(ghost.id, "ghost", command, kore)
+
+            # --- FASE SENTINEL (NUEVA LÓGICA DE COORDINACIÓN) ---
+            print(f"--- FASE SENTINEL --- ({len(active_sentinels)} activos)")
+            
+            # 2a. Identificar objetivos primarios (nodos con Ghosts)
+            ghost_nodes_as_targets = [node for row in kore.nodes for node in row if node.ghosts]
+            
+            for i, sentinel in enumerate(active_sentinels):
+                command = "rest" # Comando por defecto si no se puede hacer nada
+                
+                # 2b. Asignar objetivo si hay Ghosts disponibles
+                if ghost_nodes_as_targets:
+                    # Se asigna un objetivo usando el operador módulo para distribuir la carga
+                    target_node = ghost_nodes_as_targets[i % len(ghost_nodes_as_targets)]
+                    start_node = kore.get_node_by_position(sentinel.position_x, sentinel.position_y)
+                    
+                    if start_node and target_node:
+                        # La IA calcula la ruta al objetivo ASIGNADO
+                        path = a_star_search(kore, start_node, target_node)
+                        if path and len(path) > 1:
+                            # Si hay ruta, se genera el comando de movimiento
+                            command = get_move_command(start_node, path[1])
+                else:
+                    # 2c. Si no hay Ghosts, cada Sentinel usa su propia lógica individual
+                    # (buscar botín, explorar, etc.)
+                    command = sentinel_turn(sentinel.id, kore)
+                
+                print(f"  - Sentinel '{sentinel.id}' decide: {command}")
+                command_processor(sentinel.id, "sentinel", command, kore)
+
+            # --- VERIFICACIÓN DE FIN DE JUEGO ---
+            winner = check_game_over(kore, turn_count)
+            if winner:
+                print("\n########################################")
+                print(winner)
+                print("########################################")
+                running = False
+            # Actualiza para el siguiente turno
+            turn_count += 1
             last_action_time = current_time
+            print("=" * 25)
 
         screen.fill(BLACK)
         draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font)
@@ -428,3 +580,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
