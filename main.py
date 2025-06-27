@@ -1,3 +1,4 @@
+from ghost_method import ghost_turn
 import pygame
 import sys
 import os
@@ -7,6 +8,7 @@ from kore import Kore
 from Sentinel import Sentinel
 from Node import Node, Connection
 from Ghost import Ghost
+from sentinel_method import sentinel_turn
 
 # Constants
 FPS = 30
@@ -373,11 +375,45 @@ def sentinel_command_processor(agent, command, kore):
     else:
         print("Unknown command.")
 
-def command_processor(agent, type, command, kore):
-    if type == "ghost":
-        ghost_command_processor(agent, command, kore)
-    elif type == "sentinel":
-        sentinel_command_processor(agent, command, kore)
+def command_processor(agent_id, agent_type, command, kore):
+    """
+    Procesa un comando para un agente específico, manejando acciones especiales
+    como la replicación antes de delegar a los procesadores específicos.
+    """
+    # --- MANEJO DE COMANDOS ESPECIALES ---
+    
+    # El comando 'replicate' es manejado aquí directamente porque altera
+    # el estado del juego creando un nuevo agente.
+    if command == "replicate" and agent_type == "ghost":
+        ghost = kore.get_agent_by_id(agent_id)
+        # Verifica que el Ghost exista y tenga suficiente botín para dividirse
+        if ghost and ghost.money > 1:
+            # Divide el botín entre el original y la réplica
+            original_money = ghost.money // 2
+            replica_money = ghost.money - original_money
+            ghost.money = original_money
+
+            # Crea la nueva réplica con un ID único
+            replica_id = f"{ghost.id}_r{random.randint(1, 999)}"
+            replica = Ghost(replica_id, ghost.position_x, ghost.position_y, replica_money)
+            
+            # Añade la réplica al mismo nodo en el que se encuentra el original
+            current_node = kore.get_node_by_position(ghost.position_x, ghost.position_y)
+            if current_node:
+                current_node.ghosts.append(replica)
+                print(f"      -> ¡ACCIÓN! {ghost.id} se ha replicado en {replica_id} en el nodo {current_node.id}.")
+        
+        # Una vez manejada la replicación, no se hace nada más en este turno.
+        return
+
+    # --- DELEGACIÓN A PROCESADORES ESPECÍFICOS ---
+    
+    # Si el comando no es uno especial, se delega al procesador correspondiente.
+    if agent_type == "ghost":
+        ghost_command_processor(agent_id, command, kore)
+    elif agent_type == "sentinel":
+        sentinel_command_processor(agent_id, command, kore)
+
 
 def main():
     pygame.init()
@@ -393,7 +429,7 @@ def main():
     kore = build_environment(GRID_COLS, GRID_ROWS, cell_width, cell_height)
 
     last_action_time = pygame.time.get_ticks()
-
+    turn_count = 1
     running = True
     while running:
         for event in pygame.event.get():
@@ -402,21 +438,39 @@ def main():
 
         current_time = pygame.time.get_ticks()
         if current_time - last_action_time >= 1000:
-            # loop_turn(kore, current_time // 1000)
-            command = input("Command: ")
-            command_processor("test_ghost", "ghost", command, kore)
-            # move-r
-            # move-l
-            # move-d
-            # move-u
-            # move-ur
-            # move-dr
-            # move-ul
-            # move-dl
-            # rest
-            # drop-10
-            # take-10
+            print(f"\n===== INICIO DEL TURNO {turn_count} =====")
+
+            # --- GESTIÓN DINÁMICA DE AGENTES ---
+            # Escanea el mapa para obtener una lista fresca de agentes en cada turno
+            active_ghosts = []
+            active_sentinels = []
+            for row in kore.nodes:
+                for node in row:
+                    active_ghosts.extend(node.ghosts)
+                    active_sentinels.extend(node.sentinels)
+            
+            # --- TURNO DE LOS GHOSTS (AUTÓNOMO) ---
+            print(f"--- FASE GHOST --- ({len(active_ghosts)} activos)")
+            for ghost in active_ghosts:
+                # La IA del Ghost decide su acción
+                command = ghost_turn(ghost.id, kore, turn_count)
+                print(f"  - Ghost '{ghost.id}' decide: {command}")
+                # El motor del juego ejecuta la acción
+                command_processor(ghost.id, "ghost", command, kore)
+
+            # --- TURNO DE LOS SENTINELS (AUTÓNOMO) ---
+            print(f"--- FASE SENTINEL --- ({len(active_sentinels)} activos)")
+            for sentinel in active_sentinels:
+                # La IA del Sentinel decide su acción
+                command = sentinel_turn(sentinel.id, kore)
+                print(f"  - Sentinel '{sentinel.id}' decide: {command}")
+                # El motor del juego ejecuta la acción
+                command_processor(sentinel.id, "sentinel", command, kore)
+
+            # Actualiza el estado para el siguiente turno
+            turn_count += 1
             last_action_time = current_time
+            print("=" * 25)
 
         screen.fill(BLACK)
         draw_environment(screen, kore, ghost_img, sentinel_img, deathghost_img, sleepingghost_img, restingsentinel_img, greedysentinel_img, money_img, cell_width, cell_height, font)
